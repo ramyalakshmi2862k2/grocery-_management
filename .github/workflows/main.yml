@@ -21,7 +21,7 @@ jobs:
         run: |
               echo "value =$GITHUB_WORKSPACE"
               cd $GITHUB_WORKSPACE
-              zip -r project.zip src/
+              zip project.zip index.html code.py 
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
