@@ -12,10 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-             name: project-zip
-             path: project.zip
+        run: cd project.zip
           
              
              
