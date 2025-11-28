@@ -20,8 +20,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: project-zip         
-          path: ./artifact-download 
+          path: artifact-download/ 
 
     
       - name: Show downloaded files
-        run: ls -R ./artifact-download
+        run: ls artifact-download/
