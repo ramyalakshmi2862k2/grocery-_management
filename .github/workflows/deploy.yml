@@ -1,0 +1,90 @@
+
+# .github/workflows/deploy.yml
+name: Build, Zip, and Deploy to S3                     # A friendly name for your workflow shown in GitHub UI
+
+on:                                                    # Defines when this workflow should run
+  push:                                                # Trigger on a push event
+    branches: [ main ]                                 # Only when code is pushed to 'main' branch
+  workflow_dispatch:                                   # Also allow manual run from the Actions tab
+
+jobs:                                                  # A workflow can have one or more jobs
+  deploy:                                              # Job ID (internal name)
+    runs-on: ubuntu-latest                             # GitHub-hosted runner OS for this job
+
+    permissions:                                       # Fine-grained permissions for the job's token
+      contents: read                                   # Read repo contents (needed for checkout)
+      id-token: write                                  # Allow OIDC for cloud auth (if used)
+
+    env:                                               # Define environment variables available to all steps in this job
+      NODE_ENV: production                             # Example environment setting for Node apps
+      AWS_REGION: ap-south-1                           # Set AWS region (change to your region)
+
+    steps:                                             # List of sequential steps in this job
+
+      - name: Checkout repository                      # Human-readable name for the step
+        uses: actions/checkout@v4                      # Official action to clone your repo into the runner
+
+      - name: Set up Node.js                           # Prepare Node.js version for the runner
+        uses: actions/setup-node@v4                    # Official action to install Node
+        with:                                          # Inputs to the action
+          node-version: '18'                           # Specify exact Node.js version
+
+      - name: Cache npm dependencies                   # Speed up builds by caching node_modules
+        uses: actions/cache@v4                         # Official caching action
+        with:
+          path: ~/.npm                                 # Location to cache
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}  # Unique cache key per OS + lockfile
+          restore-keys: |                              # Fallback keys if exact match not found
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies                     # Run install to get all packages
+        run: npm ci                                    # Use npm ci for clean, reproducible installs
+
+      - name: Lint                                     # Optional quality gate
+        run: npm run lint                              # Run your linter script
+
+      - name: Run tests                                # Ensure code passes tests before building
+        run: npm test                                  # Run unit/integration tests
+
+      - name: Build                                    # Produce production build artifacts
+        run: npm run build                             # Typically outputs to ./build or ./dist
+
+      - name: Prepare zip folder                       # Create a folder for packaging outputs
+        run: |
+          mkdir -p dist                                # Make 'dist' if it doesn't exist
+          echo "Commit: ${{ github.sha }}" > dist/BUILD_INFO.txt  # Add metadata for traceability
+
+      - name: Create zip                               # Zip the build output for deployment or release
+        run: |
+          zip --version                                # Show zip version in logs (debugging)
+          zip -r "dist/app-${{ github.sha }}.zip" build/ \        # Zip the build directory
+            -x "**/*.map" "*.DS_Store"                 # Example exclusions: source maps, Mac metadata
+
+      - name: Upload build zip as artifact             # Keep a copy attached to the workflow run
+        uses: actions/upload-artifact@v4               # Official artifact action
+        with:
+          name: build-zip                              # Artifact name visible in the run
+          path: dist/app-${{ github.sha }}.zip         # File to upload
+          if-no-files-found: error                     # Fail the step if zip is missing
+
+      - name: Configure AWS credentials                # Authenticate to AWS for deployment
+        uses: aws-actions/configure-aws-credentials@v4 # Official AWS auth action
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}           # Stored in repo/org secrets
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}   # Stored in repo/org secrets
+          aws-region: ${{ env.AWS_REGION }}                              # Use region from env above
+
+      - name: Deploy to S3                             # Sync built files to S3 bucket
+        run: aws s3 sync build/ s3://your-bucket-name --delete          # Replace with your bucket
+        # --delete removes files in the bucket that no longer exist locally (keeps target clean)
+
+      - name: Invalidate CloudFront (optional)         # Refresh CDN cache so users see new files
+        if: ${{ always() && env.CLOUDFRONT_DISTRIBUTION_ID }}           # Only if ID is set
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/*"
+
+      - name: Notify (optional)                        # Inform team via Slack/Teams/etc.
+        if: ${{ success() }}                           # Only run if previous steps succeeded
+        run: echo "Deployment succeeded for ${{ github.sha }}"          # Placeholder for real notifier
