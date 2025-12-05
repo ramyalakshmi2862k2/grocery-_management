@@ -1,7 +1,11 @@
 name: Download artifacts 
 on:
-  workflow_dispatch:   
-  push:              
+ workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Workflow run ID to pull artifacts from"
+        required: true
+        type: string    # run IDs are numeric, but dispatch inputs are strings 
 
 jobs:
   download:
