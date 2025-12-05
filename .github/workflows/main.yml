@@ -19,9 +19,9 @@ jobs:
 
       - name: Create zip file
         run: |
-              echo "value =$GITHUB_WORKSPACE"
-              cd $GITHUB_WORKSPACE
-              zip project.zip index.html code.py 
+          echo "value =$GITHUB_WORKSPACE"
+          cd $GITHUB_WORKSPACE
+          zip project.zip index.html code.py 
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
