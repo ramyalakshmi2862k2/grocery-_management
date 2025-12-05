@@ -16,11 +16,13 @@ jobs:
           
              
              
-      - name: Download build artifact
+      - name: Download artifact from another run
         uses: actions/download-artifact@v4
         with:
-          name: zip project.zip         
-          path: artifact-download/ 
+          name: project-zip                  # the artifact name in that run
+          run-id: ${{ inputs.source_run_id }} # e.g., supplied via workflow_dispatch input
+          path: artifact-download/
+          github-token: ${{ secrets.PAT }}    # fine-grained PAT with Actions:read (or repo scope for classic) 
 
     
       - name: Show downloaded files
